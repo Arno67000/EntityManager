@@ -1,8 +1,8 @@
-type PrimaryKey = 'id' | 'uid';
+type PrimaryKey<T> = keyof T;
 
-export type EntityProto<T extends { [P in PrimaryKey]: string | number }> = Omit<T, PrimaryKey>;
+export type EntityProto<T> = Omit<T, PrimaryKey<T>>;
 
-export type EntityBuilder<T extends { [P in PrimaryKey]: string | number }, E = EntityProto<T>> = {
+export type EntityBuilder<T, E = EntityProto<T>> = {
     /**
      * @description Build and return the EntityProto
      */
@@ -17,12 +17,12 @@ export type EntityBuilder<T extends { [P in PrimaryKey]: string | number }, E = 
     set<K extends keyof E>(key: K, value: E[K]): EntityBuilder<T>;
 }
 
-export type EntityManager<T extends { [P in PrimaryKey]: string | number }> = {
+export type EntityManager<T> = {
 
-     /**
+    /**
      * @description Clean the manager and all the necessary related resources (databases, ...), drop all builders and stored symbols
      */
-     clean(): Promise<void> | void;
+    clean(): Promise<void> | void;
 
     /**
      * @description Create and return a builder for the Entity
