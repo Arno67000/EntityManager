@@ -1,10 +1,12 @@
 {
   "name": "entitymanager",
-  "version": "1.0.0",
-  "description": "simple generic entity manager ",
-  "main": "index.ts",
+  "version": "0.0.1",
+  "description": "Simple generic entity manager",
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
   "scripts": {
-    "build": "tsc",
+    "build": "tsup",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
@@ -12,7 +14,11 @@
     "url": "git+ssh://git@github.com/Arno67000/EntityManager.git"
   },
   "keywords": [
-    "TS"
+    "TS",
+    "test",
+    "repository",
+    "builder",
+    "database"
   ],
   "author": "Arno67000",
   "license": "ISC",
@@ -21,12 +27,7 @@
   },
   "homepage": "https://github.com/Arno67000/EntityManager#readme",
   "devDependencies": {
-    "@tsconfig/node20": "^20.1.4",
-    "@types/node": "^22.5.4",
-    "ts-node": "^10.9.2",
+    "tsup": "^8.3.5",
     "typescript": "^5.5.4"
-  },
-  "engines": {
-    "node": "^20"
   }
 }
