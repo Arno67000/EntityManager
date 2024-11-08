@@ -95,3 +95,5 @@ export type DatabaseInfo<T, K extends PrimaryKey<T>> = {
 	primary_key: K;
 	PK_auto_generated: boolean;
 };
+
+export type LocalStoreInfo<T, K extends PrimaryKey<T>> = { primary_key: K };

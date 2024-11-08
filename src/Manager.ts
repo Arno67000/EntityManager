@@ -1,5 +1,5 @@
 import { Builder } from './Builder';
-import type { DatabaseInfo, EntityBuilder, EntityManager, EntityProto, PrimaryKey } from './types';
+import type { DatabaseInfo, EntityBuilder, EntityManager, EntityProto, LocalStoreInfo, PrimaryKey } from './types';
 
 export class Manager<T, K extends PrimaryKey<T>> implements EntityManager<T, K> {
 	readonly #builders: Map<symbol, EntityBuilder<T, K>>;
@@ -8,20 +8,21 @@ export class Manager<T, K extends PrimaryKey<T>> implements EntityManager<T, K> 
 	readonly #primary_key?: K;
 
 	constructor(
-		database_info?: DatabaseInfo<T, K>,
-		pk?: K,
+		config: DatabaseInfo<T, K> | LocalStoreInfo<T, K>,
 		private readonly EntityBuilder = Builder,
 	) {
 		this.#builders = new Map<symbol, EntityBuilder<T, K>>();
 		this.#localRepo = new Map<symbol, T>();
 
-		if (database_info) {
-			this.#database = database_info;
+		if (this.#isDatabaseInfo(config)) {
+			this.#database = config;
+		} else {
+			this.#primary_key = config.primary_key;
 		}
+	}
 
-		if (pk) {
-			this.#primary_key = pk;
-		}
+	#isDatabaseInfo(config: DatabaseInfo<T, K> | LocalStoreInfo<T, K>): config is DatabaseInfo<T, K> {
+		return Reflect.has(config, 'table_name');
 	}
 
 	#assert_builder_is_unique(symbol: symbol) {

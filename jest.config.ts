@@ -7,6 +7,9 @@ const config: Config = {
 		'^.+.tsx?$': ['ts-jest', { tsconfig: '<rootDir>/tsconfig.json' }],
 	},
 	preset: 'ts-jest',
+	collectCoverageFrom: ['src/**'],
+	coveragePathIgnorePatterns: ['^.+index.ts$'],
+	coverageDirectory: '__tests__/__coverage__',
 };
 
 export default config;
