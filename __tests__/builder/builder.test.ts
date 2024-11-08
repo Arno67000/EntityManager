@@ -1,66 +1,55 @@
-import { describe } from "@jest/globals";
-import { Builder } from "../../src/Builder";
+import { describe } from '@jest/globals';
+import { Builder } from '../../src/Builder';
+import MockUser from '../__mocks__/user.mock';
 
-describe("Builder", () => {
-    // Arrange for ALL tests
-    class Test {
-        id?: number;
-        ok?: boolean;
-        timeout_in_seconds: number;
+describe('Builder', () => {
+	test('Should create a builder when initialized with a class', () => {
+		// Act
+		const builder = new Builder<MockUser, 'name'>(MockUser);
 
-        constructor() {
-            this.timeout_in_seconds = 5;
-        }
-    }
+		// Assert
+		expect(builder).toBeDefined();
+		expect(builder).toHaveProperty('set');
+		expect(builder).toHaveProperty('compute');
+		expect(builder).not.toHaveProperty('age');
+		expect(builder).not.toHaveProperty('status');
+	});
 
-    test("Should create a builder when initialized with a class", () => {
-        // Act
-        const builder = new Builder<Test, 'id'>(Test);
+	test('Should be able to compute to an instance of a class using default values', () => {
+		// Arrange
+		const builder = new Builder<MockUser, 'name'>(MockUser);
 
-        // Assert
-        expect(builder).toBeDefined();
-        expect(builder).toHaveProperty('set');
-        expect(builder).toHaveProperty('compute');
-        expect(builder).not.toHaveProperty('ok');
-        expect(builder).not.toHaveProperty('timeout_in_seconds');
-    })
+		//Act
+		const result = builder.compute();
 
-    test("Should be able to compute to an instance of a class using default values", () => {
-        // Arrange
-        const builder = new Builder<Test, 'id'>(Test);
+		// Assert
+		expect(result).toBeDefined();
+		expect(result).toHaveProperty('age');
+		expect(result).toHaveProperty('status');
+		expect(result.status).toStrictEqual('active');
+		expect(result.age).toBeUndefined();
+		expect(result).toHaveProperty('name');
+		expect(result).not.toHaveProperty('set');
+		expect(result).not.toHaveProperty('compute');
+	});
 
-        //Act
-        const result = builder.compute()
+	test('Should be able to set values in entity, except for PrimaryKey', () => {
+		// Arrange
+		const builder = new Builder<MockUser, 'name'>(MockUser);
 
-        // Assert
-        expect(result).toBeDefined();
-        expect(result).toHaveProperty('timeout_in_seconds');
-        expect(result).toHaveProperty('ok');
-        expect(result.timeout_in_seconds).toStrictEqual(5);
-        expect(result.ok).toBeUndefined();
-        expect(result).toHaveProperty('id');
-        expect(result).not.toHaveProperty('set');
-        expect(result).not.toHaveProperty('compute');
-    })
+		//Act
+		builder.set('age', 33).set('status', 'inactive');
+		const result = builder.compute();
 
-    test("Should be able to set values in entity, except for PrimaryKey", () => {
-        // Arrange
-        const builder = new Builder<Test, 'id'>(Test);
-
-        //Act
-        builder.set('ok', true).set('timeout_in_seconds', 10)
-        const result = builder.compute()
-
-
-        // Assert
-        expect(result).toBeDefined();
-        expect(result).toHaveProperty('timeout_in_seconds');
-        expect(result).toHaveProperty('ok');
-        expect(result).toHaveProperty('id');
-        expect(result.timeout_in_seconds).toStrictEqual(10);
-        expect(result.ok).toStrictEqual(true);
-        expect(Reflect.get(result, 'id')).toBeUndefined();
-        expect(result).not.toHaveProperty('set');
-        expect(result).not.toHaveProperty('compute');
-    })
+		// Assert
+		expect(result).toBeDefined();
+		expect(result).toHaveProperty('status');
+		expect(result).toHaveProperty('age');
+		expect(result).toHaveProperty('name');
+		expect(result.status).toStrictEqual('inactive');
+		expect(result.age).toStrictEqual(33);
+		expect(Reflect.get(result, 'name')).toBeUndefined();
+		expect(result).not.toHaveProperty('set');
+		expect(result).not.toHaveProperty('compute');
+	});
 });
