@@ -1,169 +1,171 @@
-import { Builder } from "./Builder";
-import type { EntityManager, EntityBuilder, DatabaseInfo, EntityProto, PrimaryKey } from "./types";
+import { Builder } from './Builder';
+import type { DatabaseInfo, EntityBuilder, EntityManager, EntityProto, LocalStoreInfo, PrimaryKey } from './types';
 
+export class Manager<T, K extends PrimaryKey<T>> implements EntityManager<T, K> {
+	readonly #builders: Map<symbol, EntityBuilder<T, K>>;
+	readonly #localRepo: Map<symbol, T>;
+	readonly #database?: DatabaseInfo<T, K>;
+	readonly #primary_key?: K;
 
+	constructor(
+		config: DatabaseInfo<T, K> | LocalStoreInfo<T, K>,
+		private readonly EntityBuilder = Builder,
+	) {
+		this.#builders = new Map<symbol, EntityBuilder<T, K>>();
+		this.#localRepo = new Map<symbol, T>();
 
-export class Manager<T> implements EntityManager<T> {
+		if (this.#isDatabaseInfo(config)) {
+			this.#database = config;
+		} else {
+			this.#primary_key = config.primary_key;
+		}
+	}
 
-    readonly #builders: Map<symbol, EntityBuilder<T>>;
-    readonly #localRepo: Map<symbol, T>;
-    readonly #database?: DatabaseInfo<T> ;
-    readonly #primary_key?: PrimaryKey<T>;
+	#isDatabaseInfo(config: DatabaseInfo<T, K> | LocalStoreInfo<T, K>): config is DatabaseInfo<T, K> {
+		return Reflect.has(config, 'table_name');
+	}
 
-    constructor(
-        database_info?: DatabaseInfo<T>,
-        pk?: PrimaryKey<T>,
-        private readonly EntityBuilder = Builder
-    ) {
-        this.#builders = new Map<symbol, EntityBuilder<T>>();
-        this.#localRepo = new Map<symbol, T>();
+	#assert_builder_is_unique(symbol: symbol) {
+		if (this.#builders.get(symbol)) {
+			throw new Error(`Duplicate builder for symbol: ${String(symbol)}`);
+		}
+	}
 
-        if (database_info) {
-            this.#database = database_info
-        }
+	#retrieve_builder(symbol: symbol): EntityBuilder<T, K> {
+		const builder = this.#builders.get(symbol);
+		if (!builder) {
+			throw new Error(`Missing builder for symbol: ${String(symbol)}`);
+		}
+		return builder;
+	}
 
-        if (pk) {
-            this.#primary_key = pk;
-        }
-    }
+	#retrieve_entity(symbol: symbol): T {
+		const entity = this.#localRepo.get(symbol);
+		if (!entity) {
+			throw new Error(`Missing entity for symbol: ${String(symbol)}`);
+		}
+		return entity;
+	}
 
-    #assert_builder_is_unique(symbol: symbol) {
-        if (this.#builders.get(symbol)) {
-            throw new Error(`Duplicate builder for symbol: ${String(symbol)}`);
-        }
-    }
+	#assert_unique_PK(uniqueIdentifiers: [K, T[K]] | []) {
+		const [key, value] = uniqueIdentifiers;
+		if (
+			key &&
+			value &&
+			Array.from(this.#localRepo.values()).some(
+				(entity) => entity && typeof entity === 'object' && Reflect.get(entity, key) === value,
+			)
+		) {
+			throw new Error(`Primary key constraint error: value [${value}] already exists`);
+		}
+	}
 
-    #retrieve_builder(symbol: symbol): EntityBuilder<T> {
-        const builder = this.#builders.get(symbol);
-        if (!builder) {
-            throw new Error(`Missing builder for symbol: ${String(symbol)}`);
-        }
-        return builder;
-    }
+	#assert_PK_validity(uniqueIdentifiers: [K, T[K]] | []) {
+		if (this.#database) {
+			if (!this.#database.PK_auto_generated && !uniqueIdentifiers.length) {
+				throw new Error('Fatal Error: Missing Primary Key');
+			}
+			if (this.#database.PK_auto_generated && uniqueIdentifiers.length) {
+				throw new Error('Fatal Error: Can not override Primary Key auto_generated');
+			}
+		} else if (this.#primary_key) {
+			if (!uniqueIdentifiers.length) {
+				throw new Error('Fatal Error: Missing Primary Key');
+			}
+		}
+	}
 
-    #retrieve_entity(symbol: symbol): T {
-        const entity = this.#localRepo.get(symbol);
-        if (!entity) {
-            throw new Error(`Missing entity for symbol: ${String(symbol)}`);
-        }
-        return entity;
-    }
+	async #assert_database_ready() {
+		if (this.#database) {
+			return await this.#database.connector.health_check(this.#database.table_name);
+		}
+		return false;
+	}
 
-    #assert_unique_PK(uniqueIdentifiers: [PrimaryKey<T>, T[PrimaryKey<T>]] | []) {
-        const [key, value] = uniqueIdentifiers;
-        if (
-            key && value &&
-            Array.from(this.#localRepo.values())
-                .some(entity => entity && typeof entity ==='object' && Reflect.get(entity, key) === value)
-        ) {
-            throw new Error(`Primary key constraint error: value ${value} already exists`);
-        }
-    }
+	/**
+	 * @description Clean the manager and all the necessary related resources (databases, ...), drop all builders and stored symbols
+	 */
+	async clean() {
+		this.#builders.clear();
 
-    #assert_PK_validity(uniqueIdentifiers: [PrimaryKey<T>, T[PrimaryKey<T>]] | []) {
-        if (this.#database) {
-            if (!this.#database.PK_auto_generated && !uniqueIdentifiers.length) {
-                throw new Error("Fatal Error: Missing Primary Key");
-            } else if (this.#database.PK_auto_generated && uniqueIdentifiers.length) {
-                throw new Error("Fatal Error: Can not override Primary Key auto_generated");
-            }
-        } else if (this.#primary_key) {
-            if (!uniqueIdentifiers.length) {
-                throw new Error("Fatal Error: Missing Primary Key");
-            } else if (uniqueIdentifiers[0] !== this.#primary_key){
-                throw new Error("Fatal Error: Can not override existing Primary Key");
-            }
-        }
-    }
+		if (this.#database && (await this.#assert_database_ready())) {
+			for (const symbol of Array.from(this.#localRepo.keys())) {
+				await this.remove(symbol);
+			}
+			await this.#database.connector.close_connection();
+		}
 
-    async #assert_database_ready() {
-        if (this.#database) {
-            return await this.#database.connector.health_check(this.#database.table_name)
-        }
-        return false;
-    }
+		this.#localRepo.clear();
+	}
 
-    /**
-     * @description Clean the manager and all the necessary related resources (databases, ...), drop all builders and stored symbols
-     */
-    async clean() {
-        this.#builders.clear();
+	/**
+	 * @description Create and return a builder for the Entity
+	 * @param symbol Unique identifier to manage the Entity
+	 * @param constructor Class to instanciate all the required default values for the Entity
+	 * @returns EntityBuilder
+	 */
+	create(symbol: symbol, ctor: new () => EntityProto<T, K>) {
+		this.#assert_builder_is_unique(symbol);
+		this.#builders.set(symbol, new this.EntityBuilder(ctor));
+		return this.#retrieve_builder(symbol);
+	}
 
-        if (this.#database && await this.#assert_database_ready()) {
-            for (const symbol of Array.from(this.#localRepo.keys())) {
-                await this.remove(symbol);
-            }
-            await this.#database.connector.close_connection();
-        }
+	/**
+	 * @description Compute the Entity prototype to an actual Entity, save it to the storage and return it
+	 * @param symbol Unique identifier to manage the Entity
+	 * @param uniqueIdentifier Optional object containing your entity primary key and its value (usefull if no auto-generated identifier for the table)
+	 * @returns T
+	 */
+	async save(symbol: symbol, uniqueIdentifier?: [K, T[K]]) {
+		let pk = uniqueIdentifier ?? [];
+		this.#assert_PK_validity(pk);
 
-        this.#localRepo.clear();
-    }
+		const proto = this.#retrieve_builder(symbol).compute();
 
-    /**
-     * @description Create and return a builder for the Entity
-     * @param symbol Unique identifier to manage the Entity
-     * @param constructor Class to instanciate all the required default values for the Entity
-     * @returns EntityBuilder
-     */
-    create(symbol: symbol, ctor: new () => EntityProto<T>) {
-        this.#assert_builder_is_unique(symbol);
-        this.#builders.set(symbol, new this.EntityBuilder(ctor));
-        return this.#retrieve_builder(symbol);
-    }
+		if (this.#database && (await this.#assert_database_ready())) {
+			const insertable = proto;
+			pk.length && Object.assign(insertable, { [pk[0]]: pk[1] });
 
-    /**
-     * @description Compute the Entity prototype to an actual Entity, save it to the storage and return it 
-     * @param symbol Unique identifier to manage the Entity
-     * @param uniqueIdentifier Optional object containing your entity primary key and its value (usefull if no auto-generated identifier for the table)
-     * @returns T
-     */
-    async save(symbol: symbol, uniqueIdentifier?: [PrimaryKey<T>, T[PrimaryKey<T>]]) {
-        let pk = uniqueIdentifier ?? [];
-        this.#assert_PK_validity(pk);
+			const createdIdentifier = await this.#database.connector.insert(insertable);
+			if (!createdIdentifier && this.#database.PK_auto_generated) {
+				throw new Error('Database Insertion Error: no new element created');
+			}
 
-        const proto = this.#retrieve_builder(symbol).compute();
-        
-        if (this.#database && await this.#assert_database_ready()) {
-            let insertable = proto;
-            pk.length && Object.assign(insertable, { [pk[0]]: pk[1] })
+			this.#database.PK_auto_generated &&
+				createdIdentifier &&
+				(pk = [this.#database.primary_key, createdIdentifier]);
+		} else if (!this.#database && this.#primary_key) {
+			this.#assert_unique_PK(pk);
+		}
 
-            const createdIdentifier = await this.#database.connector.insert(insertable);
-            if (!createdIdentifier && this.#database.PK_auto_generated) {
-                throw new Error(`Database Insertion Error: no new element created`);
-            }
+		const entity = { ...proto, ...(pk.length && { [pk[0]]: pk[1] }) } as T;
+		this.#localRepo.set(symbol, entity);
+		return Object.freeze(entity);
+	}
 
-            this.#database.PK_auto_generated && createdIdentifier && (pk = [this.#database.primary_key, createdIdentifier]);
-        } else if (!this.#database && this.#primary_key) {
-            this.#assert_unique_PK(pk)
-        }
+	/**
+	 * @description Removes the Entity identified by the symbol from the storage and/or the database
+	 * @param symbol Unique identifier to manage the Entity
+	 */
+	async remove(symbol: symbol) {
+		let success = true;
+		if (this.#database && (await this.#assert_database_ready())) {
+			const pk = this.#retrieve_entity(symbol)[this.#database.primary_key];
+			success = await this.#database.connector.remove(pk);
+		}
+		return success && this.#localRepo.delete(symbol);
+	}
 
-        const entity = { ...proto, ...pk.length && { [pk[0]]: pk[1] } } as Readonly<T>;
-        this.#localRepo.set(symbol, entity);
-        return entity;
-    }
+	/**
+	 * @description Retrieve an entity from the storage and/or the database by its unique identifier
+	 * @param symbol Unique identifier to manage the Entity
+	 */
+	async get(symbol: symbol) {
+		if (this.#database && (await this.#assert_database_ready())) {
+			const pk = this.#retrieve_entity(symbol)[this.#database.primary_key];
+			return await this.#database.connector.get(pk);
+		}
 
-    /**
-     * @description Removes the Entity identified by the symbol from the storage and/or the database
-     * @param symbol Unique identifier to manage the Entity
-     */
-    async remove(symbol: symbol) {
-        if (this.#database && await this.#assert_database_ready()) {
-            const pk = this.#retrieve_entity(symbol)[this.#database.primary_key];
-            await this.#database.connector.remove(pk);
-        }
-        this.#localRepo.delete(symbol);
-    }
-
-    /**
-     * @description Retrieve an entity from the storage and/or the database by its unique identifier
-     * @param symbol Unique identifier to manage the Entity
-     */
-    async get(symbol: symbol) {
-        if (this.#database && await this.#assert_database_ready()) {
-            const pk = this.#retrieve_entity(symbol)[this.#database.primary_key];
-            return await this.#database.connector.get(pk);
-        }
-
-        return this.#localRepo.get(symbol);
-    }
+		return this.#localRepo.get(symbol);
+	}
 }

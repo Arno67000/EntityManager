@@ -1,29 +1,27 @@
-import { EntityBuilder, EntityProto } from "./types";
+import type { EntityBuilder, EntityProto, PrimaryKey } from './types';
 
-export class Builder<T> implements EntityBuilder<T> {
+export class Builder<T, K extends PrimaryKey<T>> implements EntityBuilder<T, K> {
+	#proto: EntityProto<T, K>;
 
-    #proto: EntityProto<T>;
+	constructor(ctor: new () => EntityProto<T, K>) {
+		this.#proto = new ctor();
+	}
 
+	/**
+	 * @description Set values in the EntityProto and return EntityBuilder
+	 * @param key The key to target in the EntityProto (type-safe)
+	 * @param value The value to assign to the key (type-safe)
+	 * @returns EntityBuilder
+	 */
+	set<Y extends keyof EntityProto<T, K>>(key: Y, value: EntityProto<T, K>[Y]) {
+		this.#proto[key] = value;
+		return this;
+	}
 
-    constructor(ctor: new () => EntityProto<T>) {
-        this.#proto = new ctor();
-    }
-
-    /**
-     * @description Set values in the EntityProto and return EntityBuilder
-     * @param key The key to target in the EntityProto (type-safe)
-     * @param value The value to assign to the key (type-safe)
-     * @returns EntityBuilder
-     */
-    set<K extends keyof EntityProto<T>>(key: K, value: EntityProto<T>[K]) {
-        this.#proto[key] = value;
-        return this;
-    }
-
-    /**
-     * @description Build and return the EntityProto
-     */
-    compute() {
-        return this.#proto;
-    }
+	/**
+	 * @description Build and return the EntityProto
+	 */
+	compute() {
+		return this.#proto;
+	}
 }
