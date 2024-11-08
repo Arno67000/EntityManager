@@ -35,7 +35,7 @@ export type EntityManager<T, K extends PrimaryKey<T>> = {
 	 * @description Removes the Entity identified by the symbol from the storage and/or the database
 	 * @param symbol Unique identifier to manage the Entity
 	 */
-	remove(symbol: symbol): Promise<void> | void;
+	remove(symbol: symbol): Promise<boolean> | boolean;
 
 	/**
 	 * @description Compute the Entity prototype to an actual Entity, save it to the storage and return it

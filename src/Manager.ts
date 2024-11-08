@@ -56,7 +56,7 @@ export class Manager<T, K extends PrimaryKey<T>> implements EntityManager<T, K> 
 				(entity) => entity && typeof entity === 'object' && Reflect.get(entity, key) === value,
 			)
 		) {
-			throw new Error(`Primary key constraint error: value ${value} already exists`);
+			throw new Error(`Primary key constraint error: value [${value}] already exists`);
 		}
 	}
 
@@ -71,9 +71,6 @@ export class Manager<T, K extends PrimaryKey<T>> implements EntityManager<T, K> 
 		} else if (this.#primary_key) {
 			if (!uniqueIdentifiers.length) {
 				throw new Error('Fatal Error: Missing Primary Key');
-			}
-			if (uniqueIdentifiers[0] !== this.#primary_key) {
-				throw new Error('Fatal Error: Can not override existing Primary Key');
 			}
 		}
 	}
@@ -151,11 +148,12 @@ export class Manager<T, K extends PrimaryKey<T>> implements EntityManager<T, K> 
 	 * @param symbol Unique identifier to manage the Entity
 	 */
 	async remove(symbol: symbol) {
+		let success = true;
 		if (this.#database && (await this.#assert_database_ready())) {
 			const pk = this.#retrieve_entity(symbol)[this.#database.primary_key];
-			await this.#database.connector.remove(pk);
+			success = await this.#database.connector.remove(pk);
 		}
-		this.#localRepo.delete(symbol);
+		return success && this.#localRepo.delete(symbol);
 	}
 
 	/**

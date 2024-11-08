@@ -15,7 +15,7 @@ describe('Builder', () => {
 		expect(builder).not.toHaveProperty('status');
 	});
 
-	test('Should be able to compute to an instance of a class using default values', () => {
+	test('Should be able to compute to class default values without primary key', () => {
 		// Arrange
 		const builder = new Builder<MockUser, 'name'>(MockUser);
 
