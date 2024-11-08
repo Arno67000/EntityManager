@@ -3,19 +3,19 @@ import type { EntityManager, EntityBuilder, DatabaseInfo, EntityProto, PrimaryKe
 
 
 
-export class Manager<T> implements EntityManager<T> {
+export class Manager<T, K extends PrimaryKey<T>> implements EntityManager<T, K> {
 
-    readonly #builders: Map<symbol, EntityBuilder<T>>;
+    readonly #builders: Map<symbol, EntityBuilder<T, K>>;
     readonly #localRepo: Map<symbol, T>;
-    readonly #database?: DatabaseInfo<T> ;
-    readonly #primary_key?: PrimaryKey<T>;
+    readonly #database?: DatabaseInfo<T, K> ;
+    readonly #primary_key?: K;
 
     constructor(
-        database_info?: DatabaseInfo<T>,
-        pk?: PrimaryKey<T>,
+        database_info?: DatabaseInfo<T, K>,
+        pk?: K,
         private readonly EntityBuilder = Builder
     ) {
-        this.#builders = new Map<symbol, EntityBuilder<T>>();
+        this.#builders = new Map<symbol, EntityBuilder<T, K>>();
         this.#localRepo = new Map<symbol, T>();
 
         if (database_info) {
@@ -33,7 +33,7 @@ export class Manager<T> implements EntityManager<T> {
         }
     }
 
-    #retrieve_builder(symbol: symbol): EntityBuilder<T> {
+    #retrieve_builder(symbol: symbol): EntityBuilder<T, K> {
         const builder = this.#builders.get(symbol);
         if (!builder) {
             throw new Error(`Missing builder for symbol: ${String(symbol)}`);
@@ -49,7 +49,7 @@ export class Manager<T> implements EntityManager<T> {
         return entity;
     }
 
-    #assert_unique_PK(uniqueIdentifiers: [PrimaryKey<T>, T[PrimaryKey<T>]] | []) {
+    #assert_unique_PK(uniqueIdentifiers: [K, T[K]] | []) {
         const [key, value] = uniqueIdentifiers;
         if (
             key && value &&
@@ -60,7 +60,7 @@ export class Manager<T> implements EntityManager<T> {
         }
     }
 
-    #assert_PK_validity(uniqueIdentifiers: [PrimaryKey<T>, T[PrimaryKey<T>]] | []) {
+    #assert_PK_validity(uniqueIdentifiers: [K, T[K]] | []) {
         if (this.#database) {
             if (!this.#database.PK_auto_generated && !uniqueIdentifiers.length) {
                 throw new Error("Fatal Error: Missing Primary Key");
@@ -105,7 +105,7 @@ export class Manager<T> implements EntityManager<T> {
      * @param constructor Class to instanciate all the required default values for the Entity
      * @returns EntityBuilder
      */
-    create(symbol: symbol, ctor: new () => EntityProto<T>) {
+    create(symbol: symbol, ctor: new () => EntityProto<T, K>) {
         this.#assert_builder_is_unique(symbol);
         this.#builders.set(symbol, new this.EntityBuilder(ctor));
         return this.#retrieve_builder(symbol);
@@ -117,7 +117,7 @@ export class Manager<T> implements EntityManager<T> {
      * @param uniqueIdentifier Optional object containing your entity primary key and its value (usefull if no auto-generated identifier for the table)
      * @returns T
      */
-    async save(symbol: symbol, uniqueIdentifier?: [PrimaryKey<T>, T[PrimaryKey<T>]]) {
+    async save(symbol: symbol, uniqueIdentifier?: [K, T[K]]) {
         let pk = uniqueIdentifier ?? [];
         this.#assert_PK_validity(pk);
 
@@ -137,9 +137,9 @@ export class Manager<T> implements EntityManager<T> {
             this.#assert_unique_PK(pk)
         }
 
-        const entity = { ...proto, ...pk.length && { [pk[0]]: pk[1] } } as Readonly<T>;
+        const entity = { ...proto, ...pk.length && { [pk[0]]: pk[1] } } as T;
         this.#localRepo.set(symbol, entity);
-        return entity;
+        return Object.freeze(entity);
     }
 
     /**

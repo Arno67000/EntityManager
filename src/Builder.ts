@@ -1,11 +1,11 @@
-import { EntityBuilder, EntityProto } from "./types";
+import { EntityBuilder, EntityProto, PrimaryKey } from "./types";
 
-export class Builder<T> implements EntityBuilder<T> {
+export class Builder<T, K extends PrimaryKey<T>> implements EntityBuilder<T, K> {
 
-    #proto: EntityProto<T>;
+    #proto: EntityProto<T, K>;
 
 
-    constructor(ctor: new () => EntityProto<T>) {
+    constructor(ctor: new () => EntityProto<T, K>) {
         this.#proto = new ctor();
     }
 
@@ -15,7 +15,7 @@ export class Builder<T> implements EntityBuilder<T> {
      * @param value The value to assign to the key (type-safe)
      * @returns EntityBuilder
      */
-    set<K extends keyof EntityProto<T>>(key: K, value: EntityProto<T>[K]) {
+    set<Y extends keyof EntityProto<T, K>>(key: Y, value: EntityProto<T, K>[Y]) {
         this.#proto[key] = value;
         return this;
     }
