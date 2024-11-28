@@ -17,7 +17,7 @@ export type EntityBuilder<T, K extends PrimaryKey<T>> = {
 	set<Y extends keyof EntityProto<T, K>>(key: Y, value: EntityProto<T, K>[Y]): EntityBuilder<T, K>;
 };
 
-export type EntityManager<T, K extends PrimaryKey<T>> = {
+export type EntityManager<T, K extends PrimaryKey<T> = never> = {
 	/**
 	 * @description Clean the manager and all the necessary related resources (databases, ...), drop all builders and stored symbols
 	 */
@@ -89,11 +89,11 @@ export type AsyncStorageConnector<T, K extends PrimaryKey<T>> = {
 	close_connection: () => Promise<void>;
 };
 
-export type DatabaseInfo<T, K extends PrimaryKey<T>> = {
+export type DatabaseTableInfo<T, K extends PrimaryKey<T>> = {
 	connector: AsyncStorageConnector<T, K>;
 	table_name: string;
 	primary_key: K;
 	PK_auto_generated: boolean;
 };
 
-export type LocalStoreInfo<T, K extends PrimaryKey<T>> = { primary_key: K };
+export type LocalStoreInfo<T, K extends PrimaryKey<T>> = { primary_key?: K };

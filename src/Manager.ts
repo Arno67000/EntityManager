@@ -1,27 +1,27 @@
 import { Builder } from './Builder';
-import type { DatabaseInfo, EntityBuilder, EntityManager, EntityProto, LocalStoreInfo, PrimaryKey } from './types';
+import type { DatabaseTableInfo, EntityBuilder, EntityManager, EntityProto, LocalStoreInfo, PrimaryKey } from './types';
 
-export class Manager<T, K extends PrimaryKey<T>> implements EntityManager<T, K> {
+export class Manager<T, K extends PrimaryKey<T> = never> implements EntityManager<T, K> {
 	readonly #builders: Map<symbol, EntityBuilder<T, K>>;
 	readonly #localRepo: Map<symbol, T>;
-	readonly #database?: DatabaseInfo<T, K>;
+	readonly #database?: DatabaseTableInfo<T, K>;
 	readonly #primary_key?: K;
 
 	constructor(
-		config: DatabaseInfo<T, K> | LocalStoreInfo<T, K>,
+		config: DatabaseTableInfo<T, K> | LocalStoreInfo<T, K>,
 		private readonly EntityBuilder = Builder,
 	) {
 		this.#builders = new Map<symbol, EntityBuilder<T, K>>();
 		this.#localRepo = new Map<symbol, T>();
 
-		if (this.#isDatabaseInfo(config)) {
+		if (this.#isDatabaseTableInfo(config)) {
 			this.#database = config;
 		} else {
 			this.#primary_key = config.primary_key;
 		}
 	}
 
-	#isDatabaseInfo(config: DatabaseInfo<T, K> | LocalStoreInfo<T, K>): config is DatabaseInfo<T, K> {
+	#isDatabaseTableInfo(config: DatabaseTableInfo<T, K> | LocalStoreInfo<T, K>): config is DatabaseTableInfo<T, K> {
 		return Reflect.has(config, 'table_name');
 	}
 
