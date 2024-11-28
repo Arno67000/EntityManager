@@ -10,7 +10,8 @@
     "lint": "biome check",
     "lint:fix": "biome check --fix",
     "push": "npm run test && npm run build && npm publish",
-    "test": "jest --verbose"
+    "test": "jest --verbose",
+    "test:coverage": "jest --verbose --coverage"
   },
   "repository": {
     "type": "git",
