@@ -36,7 +36,7 @@ describe('Manager #without_database', () => {
 		});
 	});
 
-	describe('save', () => {
+	describe('save with primary_key', () => {
 		// Arrange
 		const manager = new Manager<MockUser, 'name'>(localStoreConfig);
 
@@ -82,6 +82,27 @@ describe('Manager #without_database', () => {
 
 			// Assert
 			await expect(user).rejects.toThrow('Primary key constraint error: value [John] already exists');
+		});
+	});
+
+	describe('save without primary key constraint', () => {
+		// Arrange
+		const manager = new Manager<MockUser>({});
+		const symUser = Symbol('user-test');
+
+		afterEach(async () => await manager.clean());
+
+		test('should return entity without error if no primary_key set from config', async () => {
+			// Arrange
+			manager.create(symUser, MockUser).set('age', 33).set('status', 'active').set('name', 'John');
+
+			// Act
+			const user = await manager.save(symUser);
+
+			// Assert
+			expect(user.status).toStrictEqual('active');
+			expect(user.name).toStrictEqual('John');
+			expect(user.age).toStrictEqual(33);
 		});
 	});
 
