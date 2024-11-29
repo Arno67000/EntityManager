@@ -6,5 +6,5 @@ export type {
 	EntityManager,
 	EntityProto,
 	AsyncStorageConnector,
-	DatabaseInfo,
+	DatabaseTableInfo,
 } from './types';

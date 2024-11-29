@@ -2,7 +2,7 @@ import type { Config } from 'jest';
 
 const config: Config = {
 	testEnvironment: 'node',
-	testPathIgnorePatterns: ['^.+.mock..+'],
+	testPathIgnorePatterns: ['^.+mock.+', '^.*__coverage__/.*', '^.*__mocks__/.*'],
 	transform: {
 		'^.+.tsx?$': ['ts-jest', { tsconfig: '<rootDir>/tsconfig.json' }],
 	},

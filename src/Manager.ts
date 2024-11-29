@@ -1,27 +1,27 @@
 import { Builder } from './Builder';
-import type { DatabaseInfo, EntityBuilder, EntityManager, EntityProto, LocalStoreInfo, PrimaryKey } from './types';
+import type { DatabaseTableInfo, EntityBuilder, EntityManager, EntityProto, LocalStoreInfo, PrimaryKey } from './types';
 
-export class Manager<T, K extends PrimaryKey<T>> implements EntityManager<T, K> {
+export class Manager<T, K extends PrimaryKey<T> = never> implements EntityManager<T, K> {
 	readonly #builders: Map<symbol, EntityBuilder<T, K>>;
 	readonly #localRepo: Map<symbol, T>;
-	readonly #database?: DatabaseInfo<T, K>;
+	readonly #database?: DatabaseTableInfo<T, K>;
 	readonly #primary_key?: K;
 
 	constructor(
-		config: DatabaseInfo<T, K> | LocalStoreInfo<T, K>,
+		config: DatabaseTableInfo<T, K> | LocalStoreInfo<T, K>,
 		private readonly EntityBuilder = Builder,
 	) {
 		this.#builders = new Map<symbol, EntityBuilder<T, K>>();
 		this.#localRepo = new Map<symbol, T>();
 
-		if (this.#isDatabaseInfo(config)) {
+		if (this.#isDatabaseTableInfo(config)) {
 			this.#database = config;
 		} else {
 			this.#primary_key = config.primary_key;
 		}
 	}
 
-	#isDatabaseInfo(config: DatabaseInfo<T, K> | LocalStoreInfo<T, K>): config is DatabaseInfo<T, K> {
+	#isDatabaseTableInfo(config: DatabaseTableInfo<T, K> | LocalStoreInfo<T, K>): config is DatabaseTableInfo<T, K> {
 		return Reflect.has(config, 'table_name');
 	}
 
@@ -76,8 +76,15 @@ export class Manager<T, K extends PrimaryKey<T>> implements EntityManager<T, K> 
 	}
 
 	async #assert_database_ready() {
+		return Boolean(this.#database && (await this.#database.connector.health_check(this.#database.table_name)));
+	}
+
+	/**
+	 * @description Connect database, pool ...
+	 */
+	async connect() {
 		if (this.#database) {
-			return await this.#database.connector.health_check(this.#database.table_name);
+			return await this.#database.connector.get_connection(this.#database.table_name);
 		}
 		return false;
 	}
@@ -126,7 +133,7 @@ export class Manager<T, K extends PrimaryKey<T>> implements EntityManager<T, K> 
 			const insertable = proto;
 			pk.length && Object.assign(insertable, { [pk[0]]: pk[1] });
 
-			const createdIdentifier = await this.#database.connector.insert(insertable);
+			const createdIdentifier = await this.#database.connector.insert(insertable, this.#database.table_name);
 			if (!createdIdentifier && this.#database.PK_auto_generated) {
 				throw new Error('Database Insertion Error: no new element created');
 			}
@@ -151,7 +158,10 @@ export class Manager<T, K extends PrimaryKey<T>> implements EntityManager<T, K> 
 		let success = true;
 		if (this.#database && (await this.#assert_database_ready())) {
 			const pk = this.#retrieve_entity(symbol)[this.#database.primary_key];
-			success = await this.#database.connector.remove(pk);
+			success = await this.#database.connector.remove(
+				[this.#database.primary_key, pk],
+				this.#database.table_name,
+			);
 		}
 		return success && this.#localRepo.delete(symbol);
 	}
@@ -163,7 +173,7 @@ export class Manager<T, K extends PrimaryKey<T>> implements EntityManager<T, K> 
 	async get(symbol: symbol) {
 		if (this.#database && (await this.#assert_database_ready())) {
 			const pk = this.#retrieve_entity(symbol)[this.#database.primary_key];
-			return await this.#database.connector.get(pk);
+			return await this.#database.connector.get([this.#database.primary_key, pk], this.#database.table_name);
 		}
 
 		return this.#localRepo.get(symbol);
