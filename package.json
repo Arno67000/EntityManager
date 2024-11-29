@@ -1,6 +1,6 @@
 {
   "name": "entity-manager",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "Simple generic entity manager",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
