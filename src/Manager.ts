@@ -76,8 +76,15 @@ export class Manager<T, K extends PrimaryKey<T> = never> implements EntityManage
 	}
 
 	async #assert_database_ready() {
+		return Boolean(this.#database && (await this.#database.connector.health_check(this.#database.table_name)));
+	}
+
+	/**
+	 * @description Connect database, pool ...
+	 */
+	async connect() {
 		if (this.#database) {
-			return await this.#database.connector.health_check(this.#database.table_name);
+			return await this.#database.connector.get_connection(this.#database.table_name);
 		}
 		return false;
 	}
@@ -126,7 +133,7 @@ export class Manager<T, K extends PrimaryKey<T> = never> implements EntityManage
 			const insertable = proto;
 			pk.length && Object.assign(insertable, { [pk[0]]: pk[1] });
 
-			const createdIdentifier = await this.#database.connector.insert(insertable);
+			const createdIdentifier = await this.#database.connector.insert(insertable, this.#database.table_name);
 			if (!createdIdentifier && this.#database.PK_auto_generated) {
 				throw new Error('Database Insertion Error: no new element created');
 			}
@@ -151,7 +158,10 @@ export class Manager<T, K extends PrimaryKey<T> = never> implements EntityManage
 		let success = true;
 		if (this.#database && (await this.#assert_database_ready())) {
 			const pk = this.#retrieve_entity(symbol)[this.#database.primary_key];
-			success = await this.#database.connector.remove(pk);
+			success = await this.#database.connector.remove(
+				[this.#database.primary_key, pk],
+				this.#database.table_name,
+			);
 		}
 		return success && this.#localRepo.delete(symbol);
 	}
@@ -163,7 +173,7 @@ export class Manager<T, K extends PrimaryKey<T> = never> implements EntityManage
 	async get(symbol: symbol) {
 		if (this.#database && (await this.#assert_database_ready())) {
 			const pk = this.#retrieve_entity(symbol)[this.#database.primary_key];
-			return await this.#database.connector.get(pk);
+			return await this.#database.connector.get([this.#database.primary_key, pk], this.#database.table_name);
 		}
 
 		return this.#localRepo.get(symbol);

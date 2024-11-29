@@ -83,6 +83,27 @@ describe('Manager #without_database', () => {
 			// Assert
 			await expect(user).rejects.toThrow('Primary key constraint error: value [John] already exists');
 		});
+
+		test('should throw Error if duplicate symbol', () => {
+			// Arrange
+			const symUser1 = Symbol('user-test-1');
+			manager.create(symUser1, MockUser).set('age', 33).set('status', 'active');
+
+			// Assert
+			expect(() => manager.create(symUser1, MockUser)).toThrow(
+				`Duplicate builder for symbol: ${String(symUser1)}`,
+			);
+		});
+
+		test('should throw Error if missing builder', async () => {
+			// Arrange
+			const symUser1 = Symbol('user-test-1');
+
+			// Assert
+			await expect(manager.save(symUser1, ['name', 'John'])).rejects.toThrow(
+				`Missing builder for symbol: ${String(symUser1)}`,
+			);
+		});
 	});
 
 	describe('save without primary key constraint', () => {
@@ -189,6 +210,19 @@ describe('Manager #without_database', () => {
 
 			// Assert
 			expect(user).toBeUndefined();
+		});
+	});
+
+	describe('connect', () => {
+		test('should return false if no database', async () => {
+			// Arrange
+			const manager = new Manager<MockUser, 'name'>(localStoreConfig);
+
+			// Act
+			const result = await manager.connect();
+
+			// Assert
+			expect(result).toBeFalsy();
 		});
 	});
 });
